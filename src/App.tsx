@@ -8,6 +8,8 @@ import { XMLParser } from 'fast-xml-parser';
 import Input from "./components/ui/input";
 import './App.css';
 import ExcelJS from 'exceljs';
+import { useNavigate } from 'react-router-dom';
+import { useTableContext } from './context/TableContext';
 
 // Define the GroupInfo type
 interface GroupInfo {
@@ -27,7 +29,6 @@ const App: React.FC = () => {
   const [fields, setFields] = useState<{ [key: string]: string[] }>({});
   const [selectedFields, setSelectedFields] = useState<{ [key: string]: string[] }>({});
   const [keyFields, setKeyFields] = useState<{ [key: string]: string }>({});
-  const [mergedData, setMergedData] = useState<TableRow[] | null>(null);
   const [sheets, setSheets] = useState<{ [key: string]: string[] }>({});
   const [selectedSheets, setSelectedSheets] = useState<{ [key: string]: string }>({});
   const [mergedPreview, setMergedPreview] = useState<TableRow[] | null>(null);
@@ -36,13 +37,19 @@ const App: React.FC = () => {
   const [columnToProcess, setColumnToProcess] = useState<string>('');
   const [secondColumnToProcess, setSecondColumnToProcess] = useState<string>('');
 
+  const navigate = useNavigate();
+  const { mergedData, saveMergedData, clearData } = useTableContext();
+
   useEffect(() => {
     // Logging component lifecycle
-    console.log('Component lifecycle:', {
-      mergedData: !!mergedData,
-      selectedFieldsOrder: !!selectedFieldsOrder,
-      files: files.length,
-      tables: tables.length,
+    console.log('App State:', {
+      mergedData: mergedData ? {
+        length: mergedData.length,
+        sample: mergedData.slice(0, 1)
+      } : null,
+      selectedFieldsOrder,
+      files: files.map(f => f.name),
+      tables: tables.map(t => t.length)
     });
   }, [mergedData, selectedFieldsOrder, files, tables]);
 
@@ -262,7 +269,7 @@ const App: React.FC = () => {
     setSecondColumnToProcess(prev => prev === value ? '' : value);
   };
 
-  const mergeTables = () => {
+  const mergeTables = async () => {
     console.log('Starting merge process...');
 
     if (tables.length < 2) {
@@ -450,7 +457,7 @@ const App: React.FC = () => {
           }
         }
         
-        // Обработка второй выбранной коонки
+        // Обработа второй выбрнной коонки
         if (secondColumnToProcess) {
           const cellValue = row[secondColumnToProcess];
           if (typeof cellValue === 'string' && cellValue.includes('-')) {
@@ -459,11 +466,14 @@ const App: React.FC = () => {
         }
         return row;
       });
-      setMergedData(processedDataWithExpandedRanges);
+      
+      await saveMergedData(processedDataWithExpandedRanges);
       setMergedPreview(processedDataWithExpandedRanges.slice(0, 10));
+      console.log('Data saved:', processedDataWithExpandedRanges);
     } else {
-      setMergedData(filteredData);
+      await saveMergedData(filteredData);
       setMergedPreview(filteredData.slice(0, 10));
+      console.log('Data saved:', filteredData);
     }
 
     setSelectedFieldsOrder(allHeaders);
@@ -480,7 +490,7 @@ const App: React.FC = () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Merged');
 
-    // Добавляем заголовки и данные
+    // Добавляем заголовки и даные
     worksheet.columns = selectedFieldsOrder.map(header => ({
       header,
       key: header,
@@ -610,13 +620,13 @@ const App: React.FC = () => {
 
   // Добавим функцию для сброса состояния
   const handleReset = () => {
+    clearData();
     // Очищаем все состояния
     setFiles([]);
     setTables([]);
     setFields({});
     setSelectedFields({});
     setKeyFields({});
-    setMergedData(null);
     setSheets({});
     setSelectedSheets({});
     setMergedPreview(null);
@@ -820,19 +830,14 @@ const App: React.FC = () => {
             </select>
           </div>
 
-          {/* Кнопки управления */}
+          {/* Кнпки управления */}
           <div className="button-container">
             <button
               onClick={mergeTables}
               disabled={files.length < 2}
               style={{
                 padding: "8px 16px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
                 backgroundColor: "#59fafc",
-                color: "black",
-                fontSize: "14px",
-                cursor: "pointer",
                 marginRight: "10px",
               }}
             >
@@ -843,15 +848,32 @@ const App: React.FC = () => {
               disabled={!mergedData}
               style={{
                 padding: "8px 16px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
                 backgroundColor: "#59fafc",
-                color: "black",
-                fontSize: "14px",
-                cursor: "pointer",
+                marginRight: "10px",
               }}
             >
               Download
+            </button>
+            <button
+              onClick={async () => {
+                if (mergedData) {
+                  try {
+                    // Переходим на страницу менеджера
+                    navigate('/manager');
+                  } catch (error) {
+                    console.error('Error navigating:', error);
+                    alert('Error navigating to manager view. Please try again.');
+                  }
+                }
+              }}
+              disabled={!mergedData}
+              style={{
+                padding: "8px 16px",
+                backgroundColor: "#4CAF50",
+                color: "white",
+              }}
+            >
+              FOR CLIENT'S MANAGER
             </button>
           </div>
         </div>
