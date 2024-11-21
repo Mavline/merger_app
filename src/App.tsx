@@ -490,7 +490,7 @@ const App: React.FC = () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Merged');
 
-    // Добавляем заголовки и даные
+    // Добавляем заголовки и да��ые
     worksheet.columns = selectedFieldsOrder.map(header => ({
       header,
       key: header,
