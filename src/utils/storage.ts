@@ -7,6 +7,7 @@ export interface SavedTable {
   fullData: TableRow[];
   date: string;
   timestamp: number;
+  headers?: string[];
 }
 
 const STORAGE_KEY = 'savedTables';

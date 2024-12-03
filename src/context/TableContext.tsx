@@ -35,6 +35,11 @@ export const TableProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const saveMergedData = async (data: TableRow[]) => {
     try {
+      console.log('Data before saving:', {
+        sample: data[0],
+        keys: Object.keys(data[0]),
+        propertyNames: Object.getOwnPropertyNames(data[0])
+      });
       await dbService.saveMergedData(data);
       const tableToSave = {
         id: Date.now().toString(),
@@ -47,9 +52,9 @@ export const TableProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setMergedData(data);
       
       if (data.length > 0) {
-        const newHeaders = Object.keys(data[0]);
-        setHeaders(newHeaders);
-        setSelectedFieldsOrder(newHeaders);
+        const originalHeaders = Object.getOwnPropertyNames(data[0]);
+        setHeaders(originalHeaders);
+        setSelectedFieldsOrder(originalHeaders);
       }
       
       console.log('Data saved to context and storage:', data);
@@ -61,6 +66,11 @@ export const TableProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadMergedData = async () => {
     try {
       let data = await dbService.getLatestMergedData();
+      console.log('Data after loading from DB:', {
+        sample: data?.[0],
+        keys: data?.[0] ? Object.keys(data[0]) : [],
+        propertyNames: data?.[0] ? Object.getOwnPropertyNames(data[0]) : []
+      });
       
       if (!data) {
         const savedTables = storageService.getAllTables();
@@ -69,18 +79,18 @@ export const TableProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         setMergedData(data);
-        if (data.length > 0) {
-          const newHeaders = Object.keys(data[0]);
-          setHeaders(newHeaders);
-        }
+        const originalHeaders = Object.getOwnPropertyNames(data[0]);
+        setHeaders(originalHeaders);
+        setSelectedFieldsOrder(originalHeaders); // Добавляем эту строку
         console.log('Data loaded from storage:', data);
       }
     } catch (error) {
       console.error('Error loading data:', error);
     }
-  };
+};
+
 
   const clearData = () => {
     setMergedData(null);

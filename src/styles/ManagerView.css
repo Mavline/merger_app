@@ -115,4 +115,46 @@ th {
 
 tr:hover {
   background-color: #4a4f5a;
+}
+
+.merged-preview {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #1a1d23;
+  border-radius: 4px;
+}
+
+.merge-button {
+  margin-bottom: 20px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.saved-tables-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.button-merge {
+  background-color: #007bff;
+  color: white;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button-merge:hover {
+  background-color: #0056b3;
+}
+
+.button-merge:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
 } 

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTableContext } from '../context/TableContext';
 import { TableRow } from '../types/dataTypes';
+import { transformMergedData } from '../utils/transform';
+
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
 import '../styles/ManagerView.css';
@@ -16,6 +18,11 @@ const ManagerView: React.FC = () => {
   const [savedTables, setSavedTables] = useState<SavedTable[]>([]);
   const [selectedTable, setSelectedTable] = useState<SavedTable | null>(null);
   const [nextAction, setNextAction] = useState<() => void>(() => {});
+  const [mergedResult, setMergedResult] = useState<TableRow[] | null>(null);
+  const [transformedResult, setTransformedResult] = useState<TableRow[] | null>(null);
+  const [transformedHeaders, setTransformedHeaders] = useState<string[]>([]);
+  const [showPreviousTable, setShowPreviousTable] = useState(true);
+  const [hideOriginalTable, setHideOriginalTable] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,7 +38,7 @@ const ManagerView: React.FC = () => {
 
   const handleSave = () => {
     if (processedData && fullData) {
-      const newTable = storageService.saveTable({
+      storageService.saveTable({
         id: Date.now().toString(),
         name: `Table ${fullData[0]['PART NUM'] || 'Unknown'}`,
         data: processedData,
@@ -73,17 +80,45 @@ const ManagerView: React.FC = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Merged');
 
-      worksheet.columns = selectedFieldsOrder.map(header => ({
+      // Фильтруем данные перед созданием Excel
+      const filteredTableData = table.fullData.map(row => {
+        const filteredRow: Record<string, any> = {};
+        Object.entries(row).forEach(([key, value]) => {
+          if (key === 'LevelValue' || 
+              key === 'QTY' || 
+              (!key.startsWith('Level_') && key !== 'Note')) {
+            filteredRow[key] = value;
+          }
+        });
+        return filteredRow;
+      });
+
+      // Получаем заголовки из отфильтрованных данных
+      const headers = Array.from(
+        new Set(
+          filteredTableData.flatMap(row => Object.keys(row))
+        )
+      );
+
+      // Настраиваем колонки
+      worksheet.columns = headers.map(header => ({
         header,
         key: header,
-        width: header.startsWith('Level_') ? 8.43 : 
-               header === 'LevelValue' ? 8.43 : 
-               header === 'Note' ? 8.43 : 
-               12
+        width: header.startsWith('LevelValue') ? 8.43 : 12
       }));
 
-      worksheet.addRows(table.fullData);
+      // Добавляем отфильтрованные данные
+      worksheet.addRows(
+        filteredTableData.map(row => {
+          const newRow: Record<string, any> = {};
+          headers.forEach(header => {
+            newRow[header] = row[header] !== undefined ? row[header] : '';
+          });
+          return newRow;
+        })
+      );
 
+      // Стилизуем заголовки
       worksheet.getRow(1).eachCell((cell) => {
         cell.fill = {
           type: 'pattern',
@@ -111,7 +146,9 @@ const ManagerView: React.FC = () => {
             size: 9
           };
           cell.border = {
+            top: { style: 'thin' },
             left: { style: 'thin' },
+            bottom: { style: 'thin' },
             right: { style: 'thin' }
           };
         });
@@ -148,6 +185,7 @@ const ManagerView: React.FC = () => {
       alert('Error downloading table. Please try again.');
     }
   };
+  
 
   const handleDeleteTable = (tableId: string) => {
     storageService.deleteTable(tableId);
@@ -157,6 +195,103 @@ const ManagerView: React.FC = () => {
       setSelectedTable(null);
       setProcessedData(null);
       setFullData(null);
+    }
+  };
+
+  const mergeTables = () => {
+    if (savedTables.length < 2) {
+      alert('Необходимо минимум 2 таблицы для объединения');
+      return;
+    }
+  
+    try {
+      console.log('Начинаем процесс трансформации таблиц');
+      console.log('Количество таблиц для обработки:', savedTables.length);
+  
+      // Проверяем наличие ключевого поля PART NUM во всех таблицах
+      const allTablesHaveKeyField = savedTables.every(table => 
+        table.fullData.length === 0 || 'PART NUM' in table.fullData[0]
+      );
+  
+      if (!allTablesHaveKeyField) {
+        console.error('Ошибка: не все таблицы содержат PART NUM');
+        alert('Все таблицы должны содержать ключевое поле PART NUM');
+        return;
+      }
+  
+      // Получаем исходные таблицы
+      const originalTables = savedTables
+        .filter(table => !table.name.startsWith('Merged_') && !table.name.startsWith('Transformed_'))
+        .map(table => table.fullData);
+  
+      // Получаем имена исходных файлов
+      const sourceFiles = savedTables
+        .filter(table => !table.name.startsWith('Merged_') && !table.name.startsWith('Transformed_'))
+        .map(table => table.name.replace('Table ', ''));
+  
+      // Трансформируем данные
+      const { data: transformed, headers: newHeaders } = transformMergedData(originalTables, sourceFiles);
+      
+      // Сохраняем трансформированную таблицу
+      const newTable = storageService.saveTable({
+        id: Date.now().toString(),
+        name: `Transformed_${new Date().toISOString()}`,
+        data: transformed,
+        fullData: transformed,
+        date: new Date().toLocaleString()
+      });
+  
+      if (newTable) {
+        setTransformedResult(transformed);
+        setTransformedHeaders(newHeaders);
+        setSavedTables(storageService.getAllTables());
+        setShowPreviousTable(false);
+      }
+    } catch (error) {
+      console.error('Ошибка при трансформации данных:', error);
+      alert('Error transforming data. Please try again.');
+    }
+  };
+  
+
+  const handleTransform = () => {
+    if (!mergedResult) {
+      alert('Сначала необходимо объединить таблицы');
+      return;
+    }
+
+    try {
+      // Получаем исходные таблицы
+      const originalTables = savedTables
+        .filter(table => !table.name.startsWith('Merged_'))
+        .map(table => table.fullData);
+
+      // Получаем имена исходных файлов
+      const sourceFiles = savedTables
+        .filter(table => !table.name.startsWith('Merged_'))
+        .map(table => table.name.replace('Table ', ''));
+
+      // Трансформируем данные
+      const { data: transformed, headers: newHeaders } = transformMergedData(originalTables, sourceFiles);
+      
+      // Сохраняем трансформированную таблицу
+      const newTable = storageService.saveTable({
+        id: Date.now().toString(),
+        name: `Transformed_${new Date().toISOString()}`,
+        data: transformed,
+        fullData: transformed,
+        date: new Date().toLocaleString()
+      });
+
+      if (newTable) {
+        setTransformedResult(transformed);
+        setTransformedHeaders(newHeaders);
+        setSavedTables(storageService.getAllTables());
+        setShowPreviousTable(false);
+      }
+    } catch (error) {
+      console.error('Ошибка при трансформации данных:', error);
+      alert('Error transforming data. Please try again.');
     }
   };
 
@@ -184,17 +319,40 @@ const ManagerView: React.FC = () => {
 
       {savedTables.length > 0 && (
         <div className="saved-tables">
-          <h2>Saved Tables</h2>
+          <div className="saved-tables-header">
+            <h2>Saved Tables</h2>
+            <div className="button-group">
+              {savedTables.length >= 2 && (
+                <button 
+                  onClick={mergeTables}
+                  className="button button-merge"
+                >
+                  Merge All Tables
+                </button>
+              )}
+              {mergedResult && (
+                <button 
+                  onClick={handleTransform}
+                  className="button button-merge"
+                  style={{ backgroundColor: '#4CAF50' }}
+                >
+                  Transform
+                </button>
+              )}
+            </div>
+          </div>
           {savedTables.map(table => (
             <div key={table.id} className="saved-table-item">
               <span>{table.name} - {table.date}</span>
               <div className="button-group">
-                <button 
-                  onClick={() => handleViewSavedTable(table)}
-                  className="button button-primary"
-                >
-                  View
-                </button>
+                {!table.name.startsWith('Merged_') && (
+                  <button 
+                    onClick={() => handleViewSavedTable(table)}
+                    className="button button-primary"
+                  >
+                    View
+                  </button>
+                )}
                 <button 
                   onClick={() => handleDownloadTable(table)}
                   className="button button-secondary"
@@ -213,7 +371,7 @@ const ManagerView: React.FC = () => {
         </div>
       )}
       
-      {processedData && (
+      {showPreviousTable && processedData && !hideOriginalTable && (
         <div className="table-container">
           <table>
             <thead>
@@ -237,6 +395,34 @@ const ManagerView: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {transformedResult && (
+        <div className="transformed-preview">
+          <h3>Transformed Result Preview</h3>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  {transformedHeaders.map(header => (
+                    <th key={header}>{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {transformedResult.map((row, index) => (
+                  <tr key={index}>
+                    <td className="row-number">{index + 1}</td>
+                    {transformedHeaders.map((key, i) => (
+                      <td key={i}>{row[key] !== undefined ? String(row[key]) : ""}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -268,4 +454,4 @@ const ManagerView: React.FC = () => {
   );
 };
 
-export default ManagerView; 
+export default ManagerView;

@@ -5,4 +5,5 @@ export interface GroupInfo {
   group: number[];
   hidden: boolean;
   parent?: number;
-} 
+  header?: string;
+}
