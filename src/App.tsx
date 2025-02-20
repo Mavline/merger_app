@@ -8,8 +8,9 @@ import { XMLParser } from 'fast-xml-parser';
 import Input from "./components/ui/input";
 import './App.css';
 import ExcelJS from 'exceljs';
-import { useNavigate } from 'react-router-dom';
 import { useTableContext } from './context/TableContext';
+import VerticalMerge from './components/VerticalMerge';
+import './styles/VerticalMerge.css';
 
 // Define the GroupInfo type
 interface GroupInfo {
@@ -37,7 +38,6 @@ const App: React.FC = () => {
   const [columnToProcess, setColumnToProcess] = useState<string>('');
   const [secondColumnToProcess, setSecondColumnToProcess] = useState<string>('');
 
-  const navigate = useNavigate();
   const { mergedData, saveMergedData, clearData } = useTableContext();
 
   useEffect(() => {
@@ -487,10 +487,13 @@ const App: React.FC = () => {
       return;
     }
 
+    // Получаем имя первого файла без расширения
+    const firstFileName = files[0]?.name.replace(/\.[^/.]+$/, '') || 'unknown';
+    
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Merged');
 
-    // Добавляем заголовки и да��ые
+    // Добавляем заголовки и данные
     worksheet.columns = selectedFieldsOrder.map(header => ({
       header,
       key: header,
@@ -572,7 +575,11 @@ const App: React.FC = () => {
     const blob = new Blob([buffer], { 
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     });
-    saveAs(blob, 'merged_tables.xlsx');
+    
+    // Формируем имя выходного файла
+    const outputFileName = `${firstFileName}_merged.xlsx`;
+    
+    saveAs(blob, outputFileName);
   };
 
   const expandRanges = (value: string): string => {
@@ -641,43 +648,40 @@ const App: React.FC = () => {
 
   return (
     <div className="App">
+      <nav className="nav-container">
+        <div className="nav-content">
+          <a href="#" className="nav-link active">MAIN</a>
+          <a href="#" className="nav-link">ABOUT</a>
+        </div>
+      </nav>
+
       <header className="App-header">
-        {/* Добавляем кнопку RESET */}
-        <div className="reset-container" style={{ 
-          width: '100%',
-          padding: '20px',
-          backgroundColor: '#015f60',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '20px'
-        }}>
+        <div className="reset-container">
           <button
             onClick={handleReset}
-            style={{
-              padding: "12px 24px",
-              backgroundColor: "#dc3545",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              fontSize: "16px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-            }}
+            className="reset-button"
           >
             RESET
           </button>
-          <span style={{
-            fontSize: "30px",
-            color: "#59fafc",
-            fontStyle: "Arial"
-          }}>
+          <span className="reset-text">
             Start over, refresh process or clear memory
           </span>
         </div>
 
-        <h1 className="text-3xl font-bold mb-6">Excel Table Merger</h1>
+        <h1>Excel Table Merger</h1>
+
+        <div className="quick-start">
+          <h2>Quick Start Guide:</h2>
+          <ul className="quick-start-list">
+            <li>Upload two Excel files you want to compare</li>
+            <li>Select sheets from each file</li>
+            <li>Check boxes next to columns you want to compare</li>
+            <li>Select a key column (like Part Number) in each file to match rows</li>
+            <li>If same columns have different names - map them in the section below</li>
+            <li>Click "Merge" to see preview, then "Download" for full report</li>
+          </ul>
+        </div>
+
         <div className="file-container-wrapper">
           {[0, 1].map((index) => (
             <div key={index} className="file-container">
@@ -690,10 +694,11 @@ const App: React.FC = () => {
                 type="file"
                 accept=".xlsx,.xls"
                 onChange={handleFileUpload}
-                className="mb-4 w-full p-2 border border-gray-300 rounded"
+                className="mb-4 w-full p-2 border rounded"
                 style={{
-                  backgroundColor: "#59fafc",
-                  color: "black"
+                  backgroundColor: "var(--background)",
+                  color: "var(--foreground)",
+                  borderColor: "var(--border-color)"
                 }}
               />
               {!files[index] && (
@@ -709,10 +714,10 @@ const App: React.FC = () => {
                     style={{
                       width: "100%",
                       padding: "8px",
-                      border: "1px solid #ccc",
+                      border: "1px solid var(--border-color)",
                       borderRadius: "4px",
-                      backgroundColor: "#59fafc",
-                      color: "black",
+                      backgroundColor: "var(--background)",
+                      color: "var(--foreground)",
                       fontSize: "14px",
                     }}
                   >
@@ -727,7 +732,7 @@ const App: React.FC = () => {
               {files[index] && selectedSheets[files[index].name] && (
                 <div className="file-content">
                   <div className="fields-column">
-                    <h3 className="font-medium mb-2">Fields:</h3>
+                    <h3 className="font-medium mb-2" style={{ color: "var(--accent-primary)" }}>Fields:</h3>
                     {fields[files[index].name]?.map((field, fieldIndex) => (
                       <div key={`${field}-${fieldIndex}`} className="field-item">
                         {field}
@@ -735,7 +740,7 @@ const App: React.FC = () => {
                     ))}
                   </div>
                   <div className="checkbox-column">
-                    <h3 className="font-medium mb-2">Select:</h3>
+                    <h3 className="font-medium mb-2" style={{ color: "var(--accent-primary)" }}>Select:</h3>
                     {fields[files[index].name]?.map((field) => (
                       <div key={field} className="checkbox-container">
                         <input
@@ -749,7 +754,7 @@ const App: React.FC = () => {
                     ))}
                   </div>
                   <div className="key-column">
-                    <h3 className="font-medium mb-2">Key field:</h3>
+                    <h3 className="font-medium mb-2" style={{ color: "var(--accent-primary)" }}>Key field:</h3>
                     <select
                       value={keyFields[files[index].name] || ""}
                       onChange={(e) =>
@@ -761,10 +766,10 @@ const App: React.FC = () => {
                       style={{
                         width: "100%",
                         padding: "8px",
-                        border: "1px solid #ccc",
+                        border: "1px solid var(--border-color)",
                         borderRadius: "4px",
-                        backgroundColor: "#59fafc",
-                        color: "black",
+                        backgroundColor: "var(--background)",
+                        color: "var(--foreground)",
                         fontSize: "14px",
                       }}
                     >
@@ -783,17 +788,17 @@ const App: React.FC = () => {
         </div>
         <div className="controls-container">
           {/* Первый селектор столбца */}
-          <div className="range-selector" style={{ marginBottom: '10px' }}>
+          <div className="range-selector">
             <select
               value={columnToProcess}
               onChange={handleColumnToProcessChange}
               style={{
                 width: "100%",
                 padding: "8px",
-                border: "1px solid #ccc",
+                border: "1px solid var(--border-color)",
                 borderRadius: "4px",
-                backgroundColor: "#59fafc",
-                color: "black",
+                backgroundColor: "var(--background)",
+                color: "var(--foreground)",
                 fontSize: "14px",
               }}
             >
@@ -807,17 +812,17 @@ const App: React.FC = () => {
           </div>
 
           {/* Второй селектор столбца */}
-          <div className="range-selector" style={{ marginBottom: '20px' }}>
+          <div className="range-selector">
             <select
               value={secondColumnToProcess}
               onChange={handleSecondColumnToProcessChange}
               style={{
                 width: "100%",
                 padding: "8px",
-                border: "1px solid #ccc",
+                border: "1px solid var(--border-color)",
                 borderRadius: "4px",
-                backgroundColor: "#59fafc",
-                color: "black",
+                backgroundColor: "var(--background)",
+                color: "var(--foreground)",
                 fontSize: "14px",
               }}
             >
@@ -837,7 +842,8 @@ const App: React.FC = () => {
               disabled={files.length < 2}
               style={{
                 padding: "8px 16px",
-                backgroundColor: "#59fafc",
+                backgroundColor: "var(--accent-primary)",
+                color: "var(--background)",
                 marginRight: "10px",
               }}
             >
@@ -848,32 +854,12 @@ const App: React.FC = () => {
               disabled={!mergedData}
               style={{
                 padding: "8px 16px",
-                backgroundColor: "#59fafc",
+                backgroundColor: "var(--accent-green)",
+                color: "var(--background)",
                 marginRight: "10px",
               }}
             >
               Download
-            </button>
-            <button
-              onClick={async () => {
-                if (mergedData) {
-                  try {
-                    // Переходим на страницу менеджера
-                    navigate('/manager');
-                  } catch (error) {
-                    console.error('Error navigating:', error);
-                    alert('Error navigating to manager view. Please try again.');
-                  }
-                }
-              }}
-              disabled={!mergedData}
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "#4CAF50",
-                color: "white",
-              }}
-            >
-              FOR CLIENT'S MANAGER
             </button>
           </div>
         </div>
@@ -938,6 +924,15 @@ const App: React.FC = () => {
           )}
         </div>
       )}
+
+      <div className="vertical-merge-section">
+        <h2>Vertical Merge Multiple BOM Files</h2>
+        <p className="section-description">
+          Upload multiple merged BOM files to combine them vertically.
+          All level columns will be removed, and file names will be added as identifiers.
+        </p>
+        <VerticalMerge />
+      </div>
     </div>
   );
 };

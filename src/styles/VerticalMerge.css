@@ -1,0 +1,78 @@
+.vertical-merge-container {
+  padding: 2rem;
+  background-color: var(--container-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin: 2rem 0;
+}
+
+.vertical-merge-container h2 {
+  color: var(--accent-primary);
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.file-upload-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.files-list {
+  margin: 1.5rem 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background-color: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.file-item span {
+  color: var(--foreground);
+}
+
+.controls {
+  margin: 1.5rem 0;
+}
+
+.preview-container {
+  margin-top: 2rem;
+}
+
+.preview-container h3 {
+  color: var(--accent-secondary);
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+.table-container table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table-container th,
+.table-container td {
+  padding: 8px;
+  text-align: left;
+  border: 1px solid var(--border-color);
+}
+
+.table-container th {
+  background-color: var(--container-bg);
+  color: var(--accent-primary);
+}
+
+.table-container tr:hover {
+  background-color: var(--border-color);
+} 
