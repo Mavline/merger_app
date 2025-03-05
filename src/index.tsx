@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App';
+import Router from './Router';
 import reportWebVitals from './reportWebVitals';
 import { TableProvider } from './context/TableContext';
 
@@ -12,7 +12,7 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <TableProvider>
-      <App />
+      <Router />
     </TableProvider>
   </React.StrictMode>
 );

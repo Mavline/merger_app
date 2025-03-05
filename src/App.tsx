@@ -9,8 +9,6 @@ import Input from "./components/ui/input";
 import './App.css';
 import ExcelJS from 'exceljs';
 import { useTableContext } from './context/TableContext';
-import VerticalMerge from './components/VerticalMerge';
-import './styles/VerticalMerge.css';
 
 // Define the GroupInfo type
 interface GroupInfo {
@@ -23,7 +21,11 @@ interface GroupInfo {
 // Define the TableRow type
 type TableRow = Record<string, any>;
 
-const App: React.FC = () => {
+interface AppProps {
+  customNavigation?: React.ReactNode;
+}
+
+const App: React.FC<AppProps> = ({ customNavigation }) => {
 
   const [files, setFiles] = useState<File[]>([]);
   const [tables, setTables] = useState<TableRow[][]>([]);
@@ -70,9 +72,69 @@ const App: React.FC = () => {
     console.log("File upload started");
     const newFiles = Array.from(event.target.files || []);
     console.log("New files:", newFiles.map(f => f.name));
+    
+    // Очищаем input, чтобы можно было выбрать тот же файл снова
+    event.target.value = '';
+    
+    // Определяем, в какой контейнер был загружен файл
+    const inputId = event.target.id;
+    const containerIndex = parseInt(inputId.split('-')[2], 10);
+    console.log(`File uploaded to container ${containerIndex}`);
 
     for (const file of newFiles) {
       console.log(`Processing file: ${file.name}`);
+      
+      // Если в этом контейнере уже был файл, очищаем связанные с ним данные
+      if (files[containerIndex]) {
+        const oldFileName = files[containerIndex].name;
+        
+        // Очищаем старые данные
+        setSheets(prev => {
+          const newSheets = { ...prev };
+          delete newSheets[oldFileName];
+          return newSheets;
+        });
+        
+        setFields(prev => {
+          const newFields = { ...prev };
+          delete newFields[oldFileName];
+          return newFields;
+        });
+        
+        setSelectedFields(prev => {
+          const newSelected = { ...prev };
+          delete newSelected[oldFileName];
+          return newSelected;
+        });
+        
+        setKeyFields(prev => {
+          const newKeys = { ...prev };
+          delete newKeys[oldFileName];
+          return newKeys;
+        });
+        
+        setSelectedSheets(prev => {
+          const newSelected = { ...prev };
+          delete newSelected[oldFileName];
+          return newSelected;
+        });
+        
+        setGroupingStructure(prev => {
+          const newStructure = { ...prev };
+          delete newStructure[oldFileName];
+          return newStructure;
+        });
+        
+        // Очищаем таблицу для старого файла
+        setTables(prevTables => {
+          const newTables = [...prevTables];
+          if (newTables[containerIndex]) {
+            newTables[containerIndex] = [] as TableRow[];
+          }
+          return newTables;
+        });
+      }
+      
       const reader = new FileReader();
       reader.onload = async (e) => {
         console.log(`File ${file.name} loaded`);
@@ -81,11 +143,19 @@ const App: React.FC = () => {
         const sheetNames = workbook.SheetNames;
         console.log(`Sheets in ${file.name}:`, sheetNames);
 
-        setFiles(prevFiles => [...prevFiles, file]);
+        // Создаем новый массив файлов с заменой файла в нужном контейнере
+        const newFilesArray = [...files];
+        newFilesArray[containerIndex] = file;
+        setFiles(newFilesArray);
+        
+        // Обновляем список листов
         setSheets(prevSheets => ({
           ...prevSheets,
           [file.name]: sheetNames
         }));
+        
+        // Сбрасываем предварительный просмотр
+        setMergedPreview(null);
       };
       reader.readAsArrayBuffer(file);
     }
@@ -163,28 +233,47 @@ const App: React.FC = () => {
       console.log('JSON Data length:', jsonData.length);
       console.log('First few rows:', jsonData.slice(0, 5));
 
-      setTables(prevTables => {
-        console.log('Setting table data:', jsonData);
-        return [...prevTables, jsonData];
-      });
+      // Находим индекс файла в массиве файлов
+      const fileIndex = files.findIndex(f => f.name === file.name);
+      
+      if (fileIndex !== -1) {
+        // Обновляем таблицу для данного файла
+        setTables(prevTables => {
+          const newTables = [...prevTables];
+          // Если для этого индекса уже есть таблица, заменяем ее
+          newTables[fileIndex] = jsonData;
+          return newTables;
+        });
+      } else {
+        console.error(`File index not found for ${file.name}`);
+      }
 
+      // Обновляем поля для файла
       setFields(prevFields => ({
         ...prevFields,
         [file.name]: headers
       }));
+      
+      // Сбрасываем выбранные поля
       setSelectedFields(prevSelected => ({
         ...prevSelected,
         [file.name]: [],
       }));
+      
+      // Сбрасываем ключевое поле
       setKeyFields(prevKeys => ({
         ...prevKeys,
         [file.name]: '',
       }));
 
+      // Обновляем выбранный лист
       setSelectedSheets(prevSelected => ({
         ...prevSelected,
         [file.name]: sheetName
       }));
+
+      // Очищаем предварительный просмотр
+      setMergedPreview(null);
 
       if (sheetXml) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
@@ -232,6 +321,13 @@ const App: React.FC = () => {
   const handleSheetSelection = (fileName: string, sheetName: string) => {
     const file = files.find(f => f.name === fileName);
     if (file) {
+      // Обновляем выбранный лист
+      setSelectedSheets(prev => ({
+        ...prev,
+        [fileName]: sheetName
+      }));
+      
+      // Обрабатываем выбранный лист
       processSheet(file, sheetName);
     } else {
       console.error(`File not found: ${fileName}`);
@@ -243,30 +339,42 @@ const App: React.FC = () => {
       const currentFields = prevFields[fileName] || [];
       const isFieldSelected = currentFields.includes(field);
       
-      return {
+      // Создаем новый массив выбранных полей
+      const newSelectedFields = {
         ...prevFields,
         [fileName]: isFieldSelected 
           ? currentFields.filter(f => f !== field)
           : [...currentFields, field]
       };
+      
+      return newSelectedFields;
     });
+    
+    // Сбрасываем предварительный просмотр при изменении выбора полей
+    setMergedPreview(null);
   };
 
   const handleKeyFieldSelection = (fileName: string, field: string) => {
+    // Обновляем ключевое поле
     setKeyFields((prevKeys) => ({
       ...prevKeys,
       [fileName]: prevKeys[fileName] === field ? '' : field
     }));
+    
+    // Сбрасываем предварительный просмотр
+    setMergedPreview(null);
   };
 
   const handleColumnToProcessChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
-    setColumnToProcess(prev => prev === value ? '' : value);
+    setColumnToProcess(value);
+    setMergedPreview(null);
   };
 
   const handleSecondColumnToProcessChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
-    setSecondColumnToProcess(prev => prev === value ? '' : value);
+    setSecondColumnToProcess(value);
+    setMergedPreview(null);
   };
 
   const mergeTables = async () => {
@@ -625,50 +733,13 @@ const App: React.FC = () => {
     return expandedParts.join(',');
   };
 
-  // Добавим функцию для сброса состояния
-  const handleReset = () => {
-    clearData();
-    // Очищаем все состояния
-    setFiles([]);
-    setTables([]);
-    setFields({});
-    setSelectedFields({});
-    setKeyFields({});
-    setSheets({});
-    setSelectedSheets({});
-    setMergedPreview(null);
-    setSelectedFieldsOrder([]);
-    setGroupingStructure({});
-    setColumnToProcess('');
-    setSecondColumnToProcess('');
-    
-    // Перезагружаем страницу
-    window.location.reload();
-  };
-
   return (
     <div className="App">
-      <nav className="nav-container">
-        <div className="nav-content">
-          <a href="#" className="nav-link active">MAIN</a>
-          <a href="#" className="nav-link">ABOUT</a>
-        </div>
-      </nav>
+      {customNavigation}
 
       <header className="App-header">
-        <div className="reset-container">
-          <button
-            onClick={handleReset}
-            className="reset-button"
-          >
-            RESET
-          </button>
-          <span className="reset-text">
-            Start over, refresh process or clear memory
-          </span>
-        </div>
 
-        <h1>Excel Table Merger</h1>
+        <h1>EXCEL TABLES FUSION - SPREADSHEETS HORIZONTAL MERGER</h1>
 
         <div className="quick-start">
           <h2>Quick Start Guide:</h2>
@@ -686,23 +757,67 @@ const App: React.FC = () => {
           {[0, 1].map((index) => (
             <div key={index} className="file-container">
               <h2 className="text-xl font-semibold mb-4">File {index + 1}</h2>
-              <label htmlFor={`file-input-${index}`} className="mb-2 block">
-                Choose Excel file:
-              </label>
-              <Input
-                id={`file-input-${index}`}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-                className="mb-4 w-full p-2 border rounded"
-                style={{
-                  backgroundColor: "var(--background)",
-                  color: "var(--foreground)",
-                  borderColor: "var(--border-color)"
-                }}
-              />
-              {!files[index] && (
-                <p className="text-gray-500 mb-4">No file selected</p>
+              
+              <div className="mb-4">
+                <input
+                  id={`file-input-${index}`}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                />
+                <button
+                  onClick={() => document.getElementById(`file-input-${index}`)?.click()}
+                  className="button"
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: 'var(--accent-green)',
+                    color: 'black',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--accent-yellow)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--accent-green)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    style={{ marginRight: '8px' }}
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Choose Excel File
+                </button>
+              </div>
+              
+              {files[index] && (
+                <p className="font-semibold mb-2" style={{ color: "var(--accent-secondary)" }}>
+                  Selected file: {files[index].name}
+                </p>
               )}
               {files[index] && sheets[files[index].name] && (
                 <div className="mb-4" style={{ width: "100%" }}>
@@ -925,14 +1040,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="vertical-merge-section">
-        <h2>Vertical Merge Multiple BOM Files</h2>
-        <p className="section-description">
-          Upload multiple merged BOM files to combine them vertically.
-          All level columns will be removed, and file names will be added as identifiers.
-        </p>
-        <VerticalMerge />
-      </div>
+      {/* Vertical merge section removed - moved to separate page */}
     </div>
   );
 };
