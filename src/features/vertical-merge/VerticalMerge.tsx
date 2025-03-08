@@ -120,7 +120,10 @@ const VerticalMerge: React.FC = () => {
       }
     }
     
-    console.log('Финальный порядок заголовков:', headersList);
+    // Удаляем заголовок "Note" из списка, сохраняя порядок остальных заголовков
+    const finalHeaders = headersList.filter(header => header !== 'Note');
+    
+    console.log('Финальный порядок заголовков:', finalHeaders);
     
     const mergedRows: TableRow[] = [];
     
@@ -128,8 +131,8 @@ const VerticalMerge: React.FC = () => {
       const fileRows = file.data.map(row => {
         const newRow: TableRow = {};
         
-        // Заполняем все столбцы в правильном порядке
-        headersList.forEach(header => {
+        // Заполняем все столбцы в правильном порядке, исключая Note
+        finalHeaders.forEach(header => {
           if (header === 'BOM') {
             newRow[header] = file.name;
           } else if (header === 'PART NUM_2' && row['PART NUM']) {
@@ -149,7 +152,7 @@ const VerticalMerge: React.FC = () => {
     console.log('Первая строка данных:', mergedRows.length > 0 ? mergedRows[0] : 'Нет данных');
     
     // Сохраняем порядок заголовков для использования при экспорте
-    setHeaderOrder(headersList);
+    setHeaderOrder(finalHeaders);
     setMergedData(mergedRows);
   };
 

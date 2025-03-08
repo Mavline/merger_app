@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import App from './App';
 import VerticalMergePage from './pages/VerticalMergePage';
+import PivotPage from './pages/PivotPage';
 import AboutPage from './pages/AboutPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -24,6 +25,12 @@ const Navigation = () => {
           className={`nav-link ${currentPath === '/vertical-merge' ? 'active' : ''}`}
         >
           VERTICAL MERGE
+        </Link>
+        <Link 
+          to="/pivot" 
+          className={`nav-link ${currentPath === '/pivot' ? 'active' : ''}`}
+        >
+          PIVOT TABLES
         </Link>
         <Link 
           to="/about" 
@@ -105,6 +112,11 @@ const Router: React.FC = () => {
         <Route path="/vertical-merge" element={
           <Layout>
             <VerticalMergePage />
+          </Layout>
+        } />
+        <Route path="/pivot" element={
+          <Layout>
+            <PivotPage />
           </Layout>
         } />
         <Route path="/about" element={
